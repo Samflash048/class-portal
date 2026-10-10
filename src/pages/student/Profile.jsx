@@ -1,13 +1,10 @@
-import { findStudent } from '../../data/mockData'
-
 export default function Profile() {
-  const student = findStudent(localStorage.getItem('regNumber'))
-  if (!student) return <p className="text-gray-500">Student not found.</p>
+  const regNumber = localStorage.getItem('regNumber') || '—'
+  const fullName = localStorage.getItem('fullName') || '—'
 
   const rows = [
-    { label: 'Full name', value: student.fullName },
-    { label: 'Registration number', value: student.regNumber },
-    { label: 'Level', value: student.level },
+    { label: 'Full name', value: fullName },
+    { label: 'Registration number', value: regNumber },
   ]
 
   return (

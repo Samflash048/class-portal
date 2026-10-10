@@ -20,6 +20,7 @@ export default function SessionCode() {
     setLoading(false)
 
     if (data?.session_code && data.session_code === code.trim().toUpperCase()) {
+      localStorage.setItem('sessionCode', code.trim().toUpperCase())
       navigate('/dashboard')
     } else {
       setError('Incorrect session code. Check the code issued to you and try again.')

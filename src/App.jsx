@@ -31,7 +31,10 @@ export default function App() {
 
         <Route path="/admin" element={<AdminLogin />} />
         <Route element={<AdminLayout />}>
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          {/* Redirect the base dashboard URL to the upload tab automatically */}
+          <Route path="/admin/dashboard" element={<Navigate to="/admin/dashboard/upload" replace />} />
+          {/* Dynamic route for the tabs */}
+          <Route path="/admin/dashboard/:tab" element={<AdminDashboard />} />
         </Route>
       </Routes>
     </BrowserRouter>

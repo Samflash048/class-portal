@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { fetchAllStudentResults } from '../../lib/api'
 import { calcCgpa } from '../../lib/gpa'
-import { firstName } from '../../data/mockData'
 
 const MEDALS = { 1: 'bg-accent text-navy', 2: 'bg-gray-300 text-navy', 3: 'bg-orange-200 text-navy' }
+const formatFirstName = (name) => name ? name.split(' ')[0] : 'Student'
 
 export default function Leaderboard() {
   const myReg = localStorage.getItem('regNumber')
@@ -64,7 +64,7 @@ export default function Leaderboard() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-mist overflow-hidden">
+      <div className="bg-white rounded-2xl border border-mist overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-gray-500 border-b border-mist">
@@ -84,7 +84,7 @@ export default function Leaderboard() {
                 </td>
                 <td className="px-6 py-3">
                   <span className="font-medium text-navy">
-                    {hidden && s.reg !== myReg ? 'Student' : firstName(s.name)}
+                    {hidden && s.reg !== myReg ? 'Student' : formatFirstName(s.name)}
                   </span>
                   {s.reg === myReg && <span className="ml-2 text-xs text-accent-dark font-medium">(you)</span>}
                 </td>

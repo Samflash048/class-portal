@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 export default function Login() {
@@ -72,6 +72,12 @@ export default function Login() {
             {loading ? 'Checking...' : 'Continue'}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <Link to="/admin" className="text-xs text-mist hover:text-white transition-colors">
+            Class Rep / Admin Access
+          </Link>
+        </div>
       </div>
     </div>
   )

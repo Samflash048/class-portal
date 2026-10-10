@@ -53,7 +53,7 @@ export default function Dues() {
       {rows.length === 0 ? (
         <p className="text-gray-500">No dues have been billed yet.</p>
       ) : (
-        <div className="bg-white rounded-2xl border border-mist overflow-hidden">
+        <div className="bg-white rounded-2xl border border-mist overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-gray-500 border-b border-mist">

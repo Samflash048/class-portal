@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useParams, Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 /* ---------- helpers ---------- */
@@ -17,48 +18,116 @@ function makeCode() {
 /* ---------- upload results tab ---------- */
 function UploadTab() {
   const [text, setText] = useState('')
+  const [semester, setSemester] = useState(1)
   const [msg, setMsg] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   async function handleUpload() {
+    setLoading(true)
+    setMsg(null)
     const rows = parseCsv(text)
-    if (!rows.length) { setMsg({ ok: false, text: 'No valid rows. Expected header: course_code,reg_number,score,grade' }); return }
+    
+    if (!rows.length) { 
+      setMsg({ ok: false, text: 'No valid rows. Expected header: course_code,reg_number,score,grade' })
+      setLoading(false)
+      return 
+    }
 
-    // look up current session + student ids + course units
-    const { data: session } = await supabase.from('sessions').select('id').eq('is_current', true).single()
-    const { data: students } = await supabase.from('students').select('id, reg_number')
+    // 1. Fetch current session, valid courses, and students
+    const [
+      { data: session }, 
+      { data: students },
+      { data: courses }
+    ] = await Promise.all([
+      supabase.from('sessions').select('id').eq('is_current', true).single(),
+      supabase.from('students').select('id, reg_number'),
+      supabase.from('courses').select('course_code')
+    ])
+
+    if (!session) {
+      setMsg({ ok: false, text: 'Error: No active session found in the database.' })
+      setLoading(false)
+      return
+    }
+
+    // 2. Validate that all courses in the CSV actually exist in your database
+    const validCourseCodes = new Set(courses.map(c => c.course_code))
+    const uploadedCodes = [...new Set(rows.map((r) => r.course_code))]
+    const missingCourses = uploadedCodes.filter(code => !validCourseCodes.has(code))
+    
+    if (missingCourses.length > 0) {
+      setMsg({ 
+        ok: false, 
+        text: `Upload blocked: The following courses are missing from the database: ${missingCourses.join(', ')}. Please add them with their correct units first.` 
+      })
+      setLoading(false)
+      return
+    }
+
+    // 3. Match students and prepare the payload
     const idByReg = Object.fromEntries(students.map((s) => [s.reg_number, s.id]))
-    const codes = [...new Set(rows.map((r) => r.course_code))]
-    await supabase.from('courses').upsert(codes.map((c) => ({ course_code: c })), { onConflict: 'course_code' })
-
     const payload = rows
       .filter((r) => idByReg[r.reg_number])
       .map((r) => ({
-        student_id: idByReg[r.reg_number], session_id: session.id,
-        semester: 1, course_code: r.course_code, score: r.score, grade: r.grade,
+        student_id: idByReg[r.reg_number], 
+        session_id: session.id,
+        semester: semester, // Now uses the dropdown value instead of being hardcoded
+        course_code: r.course_code, 
+        score: r.score, 
+        grade: r.grade,
       }))
+      
     const skipped = rows.length - payload.length
 
+    // 4. Send to Supabase
     const { error } = await supabase.from('results').upsert(payload, {
       onConflict: 'student_id,session_id,semester,course_code',
     })
-    setMsg(error
-      ? { ok: false, text: `Error: ${error.message}` }
-      : { ok: true, text: `Uploaded ${payload.length} results.${skipped ? ` Skipped ${skipped} unknown reg number(s).` : ''}` })
+    
+    setLoading(false)
+    if (error) {
+      setMsg({ ok: false, text: `Database Error: ${error.message}` })
+    } else {
+      setMsg({ ok: true, text: `Successfully uploaded ${payload.length} results.${skipped ? ` Skipped ${skipped} unknown reg number(s).` : ''}` })
+      setText('') // Clear the text box on success
+    }
   }
 
   return (
     <section id="tab-upload" className="bg-white rounded-2xl border border-mist p-6 space-y-4">
-      <h2 className="text-lg font-medium text-navy">Upload results (CSV)</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-navy">Upload results (CSV)</h2>
+        
+        {/* New Semester Selector */}
+        <select 
+          value={semester} 
+          onChange={(e) => setSemester(parseInt(e.target.value))}
+          className="rounded-xl border border-mist px-4 py-2 text-sm text-navy focus:outline-none focus:ring-2 focus:ring-accent"
+        >
+          <option value={1}>1st Semester</option>
+          <option value={2}>2nd Semester</option>
+        </select>
+      </div>
+
       <p className="text-sm text-gray-500">
-        Paste CSV with header <code className="bg-mist px-1 rounded">course_code,reg_number,score,grade</code> — same format as your result files. Existing rows for the same course + student are overwritten.
+        Paste CSV with header <code className="bg-mist px-1 rounded">course_code,reg_number,score,grade</code>. Existing rows for the same course + student are overwritten.
       </p>
-      <textarea value={text} onChange={(e) => { setText(e.target.value); setMsg(null) }} rows={8}
+      
+      <textarea 
+        value={text} 
+        onChange={(e) => { setText(e.target.value); setMsg(null) }} 
+        rows={8}
         placeholder={'course_code,reg_number,score,grade\nMTH121,2022/247147,55,C\nMTH121,2022/247614,40,E'}
-        className="w-full rounded-xl border border-mist px-4 py-3 text-sm font-mono text-navy focus:outline-none focus:ring-2 focus:ring-accent" />
+        className="w-full rounded-xl border border-mist px-4 py-3 text-sm font-mono text-navy focus:outline-none focus:ring-2 focus:ring-accent" 
+      />
+      
       <div className="flex items-center gap-4">
-        <button onClick={handleUpload}
-          className="rounded-xl bg-navy text-white px-6 py-2.5 text-sm font-medium hover:bg-navy-light transition-colors">
-          Upload
+        <button 
+          onClick={handleUpload}
+          disabled={loading}
+          className="rounded-xl bg-navy text-white px-6 py-2.5 text-sm font-medium hover:bg-navy-light transition-colors disabled:opacity-50"
+        >
+          {loading ? 'Uploading...' : 'Upload'}
         </button>
         {msg && <p className={`text-sm ${msg.ok ? 'text-green-700' : 'text-red-600'}`}>{msg.text}</p>}
       </div>
@@ -305,15 +374,17 @@ function SettingsTab() {
 }
 
 /* ---------- page ---------- */
+/* ---------- page ---------- */
 export default function AdminDashboard() {
-  return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-medium text-navy">Admin dashboard</h1>
-      <UploadTab />
-      <CodesTab />
-      <DuesTab />
-      <DuesMonitor />
-      <SettingsTab />
-    </div>
-  )
+  const { tab } = useParams()
+
+  // This acts like a traffic controller, only returning the active tab
+  switch (tab) {
+    case 'upload': return <UploadTab />
+    case 'codes': return <CodesTab />
+    case 'dues': return <DuesTab />
+    case 'monitor': return <DuesMonitor />
+    case 'settings': return <SettingsTab />
+    default: return <Navigate to="/admin/dashboard/upload" replace />
+  }
 }
